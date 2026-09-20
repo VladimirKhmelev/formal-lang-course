@@ -1,0 +1,31 @@
+digraph  {
+1;
+2;
+3;
+4;
+0;
+5;
+6;
+7;
+8;
+9;
+10;
+11;
+12;
+13;
+1 -> 2 [key=0, label=foo];
+2 -> 3 [key=0, label=foo];
+3 -> 4 [key=0, label=foo];
+4 -> 0 [key=0, label=foo];
+0 -> 1 [key=0, label=foo];
+0 -> 5 [key=0, label=bar];
+5 -> 6 [key=0, label=bar];
+6 -> 7 [key=0, label=bar];
+7 -> 8 [key=0, label=bar];
+8 -> 9 [key=0, label=bar];
+9 -> 10 [key=0, label=bar];
+10 -> 11 [key=0, label=bar];
+11 -> 12 [key=0, label=bar];
+12 -> 13 [key=0, label=bar];
+13 -> 0 [key=0, label=bar];
+}
