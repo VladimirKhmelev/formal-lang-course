@@ -49,7 +49,8 @@ class AdjacencyMatrixFA:
         current[list(self.start_states)] = True
 
         for symbol in word:
-            matrix = self.matrices.get(Symbol(symbol))
+            key = symbol if isinstance(symbol, Symbol) else Symbol(symbol)
+            matrix = self.matrices.get(key)
             if matrix is None:
                 return False
             current = current @ matrix
@@ -75,11 +76,7 @@ class AdjacencyMatrixFA:
             return True
 
         closure = self.transitive_closure()
-        return not any(
-            closure[start, final]
-            for start in self.start_states
-            for final in self.final_states
-        )
+        return closure[list(self.start_states)][:, list(self.final_states)].nnz == 0
 
 
 def intersect_automata(

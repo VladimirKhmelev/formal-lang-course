@@ -30,14 +30,28 @@ def test_accepts_rejects_unknown_symbol():
     assert not fa.accepts(["a", "z"])
 
 
+def test_accepts_on_nondeterministic_automaton():
+    graph = nx.MultiDiGraph()
+    graph.add_edge(0, 1, label="a")
+    graph.add_edge(0, 2, label="a")
+    graph.add_edge(2, 3, label="b")
+
+    fa = AdjacencyMatrixFA(graph_to_nfa(graph, {0}, {1, 3}))
+
+    assert fa.accepts(["a"])
+    assert fa.accepts(["a", "b"])
+    assert not fa.accepts(["b"])
+
+
 @pytest.mark.parametrize(
-    "regex,expected_empty",
-    [("a b", False), ("a*", False), ("(a|b)*", False)],
+    "regex,word",
+    [("a", ["a"]), ("a b", ["a", "b"]), ("(a|b)*", []), ("a* b", ["b"])],
 )
-def test_is_empty_for_non_empty_languages(regex, expected_empty):
+def test_non_empty_language_has_accepted_word(regex, word):
     fa = AdjacencyMatrixFA(regex_to_dfa(regex))
 
-    assert fa.is_empty() == expected_empty
+    assert fa.accepts(word)
+    assert not fa.is_empty()
 
 
 def test_is_empty_for_automaton_without_final_states():
@@ -48,18 +62,6 @@ def test_is_empty_for_automaton_without_final_states():
     fa.final_states = set()
 
     assert fa.is_empty()
-
-
-@pytest.mark.parametrize("regex", ["a", "a b", "(a|b)*", "a* b"])
-def test_is_empty_agrees_with_accepts_on_a_word_of_the_language(regex):
-    dfa = regex_to_dfa(regex)
-    fa = AdjacencyMatrixFA(dfa)
-
-    word = next(iter(dfa.to_regex().to_cfg().get_words()), None)
-
-    assert fa.is_empty() == (word is None)
-    if word is not None:
-        assert fa.accepts([symbol.value for symbol in word])
 
 
 def test_is_empty_for_unreachable_final_state():
@@ -166,10 +168,17 @@ def test_tensor_based_rpq_keeps_components_separate():
     assert tensor_based_rpq("a", graph, {0, 2}, {1, 3}) == {(0, 1), (2, 3)}
 
 
-def test_tensor_based_rpq_matches_nfa_acceptance():
+@pytest.mark.parametrize("regex", ["(a|b)* a", "a b a", "b*", "(a b)*"])
+def test_tensor_based_rpq_agrees_with_pyformlang_intersection(regex):
     graph = build_cycle_graph()
+    graph.add_edge(1, 1, label="b")
     nodes = set(graph.nodes)
 
-    pairs = tensor_based_rpq("a b a", graph, nodes, nodes)
+    expected = {
+        (start, final)
+        for start in nodes
+        for final in nodes
+        if not (graph_to_nfa(graph, {start}, {final}) & regex_to_dfa(regex)).is_empty()
+    }
 
-    assert pairs == {(0, 0)}
+    assert tensor_based_rpq(regex, graph, nodes, nodes) == expected
