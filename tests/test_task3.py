@@ -1,6 +1,6 @@
 import networkx as nx
 import pytest
-from pyformlang.finite_automaton import Symbol
+from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State, Symbol
 
 from project.task2 import graph_to_nfa, regex_to_dfa
 from project.task3 import AdjacencyMatrixFA, intersect_automata, tensor_based_rpq
@@ -55,13 +55,11 @@ def test_non_empty_language_has_accepted_word(regex, word):
 
 
 def test_is_empty_for_automaton_without_final_states():
-    graph = nx.MultiDiGraph()
-    graph.add_edge(0, 1, label="a")
+    nfa = NondeterministicFiniteAutomaton()
+    nfa.add_transition(State(0), Symbol("a"), State(1))
+    nfa.add_start_state(State(0))
 
-    fa = AdjacencyMatrixFA(graph_to_nfa(graph, {0}, set()))
-    fa.final_states = set()
-
-    assert fa.is_empty()
+    assert AdjacencyMatrixFA(nfa).is_empty()
 
 
 def test_is_empty_for_unreachable_final_state():
@@ -82,6 +80,25 @@ def test_intersect_automata_accepts_common_words():
 
     assert intersection.accepts(["a", "a"])
     assert not intersection.accepts(["b"])
+
+
+def test_intersect_automata_indexes_every_pair_of_states():
+    dfa1 = regex_to_dfa("a b")
+    dfa2 = regex_to_dfa("(a|b)*")
+
+    intersection = intersect_automata(AdjacencyMatrixFA(dfa1), AdjacencyMatrixFA(dfa2))
+
+    assert sorted(intersection.state_to_index.values()) == list(
+        range(intersection.states_count)
+    )
+    start_pairs = {
+        State((s1.value, s2.value))
+        for s1 in dfa1.start_states
+        for s2 in dfa2.start_states
+    }
+    assert {
+        intersection.state_to_index[state] for state in start_pairs
+    } == intersection.start_states
 
 
 def test_intersect_automata_of_disjoint_languages_is_empty():

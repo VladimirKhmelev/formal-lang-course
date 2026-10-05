@@ -2,7 +2,7 @@ from collections.abc import Iterable
 
 import numpy as np
 from networkx import MultiDiGraph
-from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, Symbol
+from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State, Symbol
 from scipy.sparse import csr_array, eye_array, kron
 
 from project.task2 import graph_to_nfa, regex_to_dfa
@@ -89,6 +89,12 @@ def intersect_automata(
     result.states_count = automaton1.states_count * automaton2.states_count
     size2 = automaton2.states_count
 
+    result.state_to_index = {
+        State((state1.value, state2.value)): index1 * size2 + index2
+        for state1, index1 in automaton1.state_to_index.items()
+        for state2, index2 in automaton2.state_to_index.items()
+    }
+
     result.matrices = {
         symbol: kron(matrix, automaton2.matrices[symbol], format="csr").astype(bool)
         for symbol, matrix in automaton1.matrices.items()
@@ -122,24 +128,18 @@ def tensor_based_rpq(
     intersection = intersect_automata(graph_fa, regex_fa)
     closure = intersection.transitive_closure().tocoo()
 
-    regex_size = regex_fa.states_count
-    index_to_node = {
-        index: state.value for state, index in graph_fa.state_to_index.items()
-    }
-
-    # Each closure entry links a (graph state, regex state) pair to another such
-    # pair; keep only those whose both halves are start/final in their automaton.
-    reachable = (
-        np.isin(closure.row // regex_size, list(graph_fa.start_states))
-        & np.isin(closure.row % regex_size, list(regex_fa.start_states))
-        & np.isin(closure.col // regex_size, list(graph_fa.final_states))
-        & np.isin(closure.col % regex_size, list(regex_fa.final_states))
+    reachable = np.isin(closure.row, list(intersection.start_states)) & np.isin(
+        closure.col, list(intersection.final_states)
     )
+
+    # Intersection states are (graph node, regex state) pairs.
+    index_to_node = {
+        index: state.value[0] for state, index in intersection.state_to_index.items()
+    }
 
     return {
         (index_to_node[start], index_to_node[final])
         for start, final in zip(
-            (closure.row[reachable] // regex_size).tolist(),
-            (closure.col[reachable] // regex_size).tolist(),
+            closure.row[reachable].tolist(), closure.col[reachable].tolist()
         )
     }
