@@ -1,3 +1,6 @@
+import random
+
+import cfpq_data
 import networkx as nx
 import pytest
 
@@ -104,3 +107,36 @@ def test_ms_bfs_agrees_with_tensor_based_rpq(regex):
         assert ms_bfs_based_rpq(regex, graph, starts, nodes) == tensor_based_rpq(
             regex, graph, starts, nodes
         )
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_ms_bfs_agrees_with_tensor_based_rpq_on_random_graph(seed):
+    rng = random.Random(seed)
+    graph = cfpq_data.labeled_binomial_graph(
+        30, 0.1, labels=["a", "b", "c"], choice=rng.choice, seed=seed
+    )
+    nodes = sorted(graph.nodes)
+    starts = set(rng.sample(nodes, rng.randint(1, len(nodes))))
+    finals = set(rng.sample(nodes, rng.randint(1, len(nodes))))
+
+    for regex in ["(a|b)* c", "a b* c*", "(a b | c)*", "a | b | c"]:
+        assert ms_bfs_based_rpq(regex, graph, starts, finals) == tensor_based_rpq(
+            regex, graph, starts, finals
+        )
+
+
+@pytest.fixture(scope="module")
+def generations_graph() -> nx.MultiDiGraph:
+    return cfpq_data.graph_from_csv(cfpq_data.download("generations"))
+
+
+@pytest.mark.parametrize(
+    "regex", ["type", "rest* first", "(first | rest)* type", "onProperty type*"]
+)
+def test_ms_bfs_agrees_with_tensor_based_rpq_on_dataset_graph(generations_graph, regex):
+    starts = set(random.Random(0).sample(sorted(generations_graph.nodes), 30))
+    nodes = set(generations_graph.nodes)
+
+    assert ms_bfs_based_rpq(
+        regex, generations_graph, starts, nodes
+    ) == tensor_based_rpq(regex, generations_graph, starts, nodes)
