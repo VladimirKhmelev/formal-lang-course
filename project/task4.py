@@ -40,33 +40,25 @@ def ms_bfs_based_rpq(
         if symbol in graph_fa.matrices
     ]
 
-    visited = front.toarray()
+    visited = front
     while front.nnz:
         reached = csr_array(front.shape, dtype=bool)
         for graph_matrix, regex_step in steps:
             reached = reached + regex_step @ (front @ graph_matrix)
-        reached = reached.tocoo()
-
-        new = ~visited[reached.row, reached.col]
-        rows, cols = reached.row[new], reached.col[new]
-        visited[rows, cols] = True
-        front = csr_array(
-            (np.ones(len(rows), dtype=bool), (rows, cols)),
-            shape=front.shape,
-            dtype=bool,
-        )
-
-    finals = sorted(graph_fa.final_states)
-    accepted = visited.reshape(len(starts), regex_size, graph_fa.states_count)[
-        :, sorted(regex_fa.final_states)
-    ].any(axis=1)[:, finals]
+        front = reached > visited
+        visited = visited + front
 
     index_to_node = {
         index: state.value for state, index in graph_fa.state_to_index.items()
     }
-    blocks, positions = np.nonzero(accepted)
+    found = visited.tocoo()
+    accepted = np.isin(found.row % regex_size, list(regex_fa.final_states)) & np.isin(
+        found.col, list(graph_fa.final_states)
+    )
 
     return {
-        (index_to_node[starts[block]], index_to_node[finals[position]])
-        for block, position in zip(blocks.tolist(), positions.tolist())
+        (index_to_node[starts[block]], index_to_node[node])
+        for block, node in zip(
+            (found.row[accepted] // regex_size).tolist(), found.col[accepted].tolist()
+        )
     }
